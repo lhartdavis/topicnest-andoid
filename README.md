@@ -53,5 +53,6 @@ Use **Choose recorder folder** if the recorder app stores files elsewhere or Med
 
 - Audio is sent as a direct base64 JSON upload to OpenRouter.
 - The default warning threshold is 25 MB. Larger files can still be attempted, but provider limits or timeouts may fail.
+- `RecursiveChunkingPolicy` defines the future splitting behavior for oversized files: recursively split by time until estimated upload windows fit the direct-upload limit, with small overlap around chunk boundaries.
 - Future production work should add audio chunking with `MediaExtractor`/`MediaMuxer` or a dedicated media pipeline.
 - Provider timestamp formats vary; the parser accepts text-only responses and optional segment/word timestamp arrays.
