@@ -40,6 +40,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.techtower.meetingtranscriber.data.entities.AudioSource
+import com.techtower.meetingtranscriber.transcription.requiresDirectUploadWarning
+import com.techtower.meetingtranscriber.transcription.willUseAutomaticMp3ProcessingBeforeTranscription
 import com.techtower.meetingtranscriber.util.formatDuration
 import com.techtower.meetingtranscriber.util.formatFileSize
 import com.techtower.meetingtranscriber.util.formatModifiedTime
@@ -94,6 +96,7 @@ fun DiscoveryScreen(
                     AudioFileRow(
                         file = file,
                         selected = file.id in state.selectedIds,
+                        maxDirectUploadBytes = maxDirectUploadBytes,
                         onToggleSelection = onToggleSelection,
                     )
                 }
@@ -108,6 +111,7 @@ fun DiscoveryScreen(
                     AudioFileRow(
                         file = file,
                         selected = file.id in state.selectedIds,
+                        maxDirectUploadBytes = maxDirectUploadBytes,
                         onToggleSelection = onToggleSelection,
                     )
                 }
@@ -133,7 +137,7 @@ fun DiscoveryScreen(
                     Text("${state.selectedIds.size} selected")
                     Button(
                         onClick = {
-                            if (state.selectedFiles.any { it.sizeBytes > maxDirectUploadBytes }) {
+                            if (state.selectedFiles.any { requiresDirectUploadWarning(it.sizeBytes, maxDirectUploadBytes) }) {
                                 showLargeFileWarning = true
                             } else {
                                 onTranscribeSelected()
@@ -152,7 +156,7 @@ fun DiscoveryScreen(
             onDismissRequest = { showLargeFileWarning = false },
             title = { Text("Large upload") },
             text = {
-                Text("One or more files is larger than ${formatFileSize(maxDirectUploadBytes)}. Direct upload may time out or fail until audio chunking is added.")
+                Text("One or more files may exceed the ${formatFileSize(maxDirectUploadBytes)} JSON upload budget after base64 encoding. The app will convert and chunk audio automatically, but processing can take longer.")
             },
             confirmButton = {
                 Button(
@@ -233,6 +237,7 @@ private fun EmptyLine(text: String) {
 private fun AudioFileRow(
     file: DiscoveredAudioFile,
     selected: Boolean,
+    maxDirectUploadBytes: Long,
     onToggleSelection: (String) -> Unit,
 ) {
     Card(
@@ -274,10 +279,28 @@ private fun AudioFileRow(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (file.willUseAutomaticMp3Processing(maxDirectUploadBytes)) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Will convert to MP3 automatically",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
             }
         }
     }
 }
+
+private fun DiscoveredAudioFile.willUseAutomaticMp3Processing(
+    maxDirectUploadBytes: Long,
+): Boolean =
+    willUseAutomaticMp3ProcessingBeforeTranscription(
+        displayName = displayName,
+        mimeType = mimeType,
+        rawBytes = sizeBytes,
+        maxDirectUploadBytes = maxDirectUploadBytes,
+    )
 
 private fun AudioSource.label(): String =
     when (this) {

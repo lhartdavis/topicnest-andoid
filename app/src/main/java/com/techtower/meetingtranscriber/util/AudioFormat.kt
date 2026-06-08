@@ -33,4 +33,14 @@ fun audioFormatFromMimeType(mimeType: String?): String? =
     }
 
 fun audioFormatFromNameOrMimeType(name: String, mimeType: String?): String? =
-    audioFormatFromName(name) ?: audioFormatFromMimeType(mimeType)
+    audioFormatFromName(name).let { extensionFormat ->
+        val mimeFormat = audioFormatFromMimeType(mimeType)
+        // Android recorder apps sometimes name MPEG-4/AAC container files with a bare .aac
+        // extension. OpenRouter/provider routing is more likely to accept the real container
+        // format, so let MediaStore's MIME type correct that ambiguous extension.
+        if (extensionFormat == "aac" && mimeFormat != null && mimeFormat != "aac") {
+            mimeFormat
+        } else {
+            extensionFormat ?: mimeFormat
+        }
+    }

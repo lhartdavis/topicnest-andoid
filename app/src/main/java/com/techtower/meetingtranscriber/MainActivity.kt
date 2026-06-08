@@ -12,9 +12,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -29,6 +31,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -40,8 +44,12 @@ import com.techtower.meetingtranscriber.discovery.DiscoveryScreen
 import com.techtower.meetingtranscriber.discovery.DiscoveryViewModel
 import com.techtower.meetingtranscriber.discovery.MediaStoreAudioScanner
 import com.techtower.meetingtranscriber.discovery.SafAudioScanner
+import com.techtower.meetingtranscriber.settings.ApiKeyValidationSnapshot
+import com.techtower.meetingtranscriber.settings.ApiKeyValidationStatus
 import com.techtower.meetingtranscriber.settings.ApiKeyDialog
+import com.techtower.meetingtranscriber.settings.OpenRouterKeyClient
 import com.techtower.meetingtranscriber.settings.SettingsRepository
+import com.techtower.meetingtranscriber.settings.SettingsViewModel
 import com.techtower.meetingtranscriber.transcription.TranscriptDetailScreen
 import com.techtower.meetingtranscriber.transcription.TranscriptDetailViewModel
 import com.techtower.meetingtranscriber.transcription.TranscriptRepository
@@ -84,8 +92,15 @@ class MainActivity : ComponentActivity() {
         val transcriptsViewModel: TranscriptsViewModel = viewModel(
             factory = SimpleViewModelFactory { TranscriptsViewModel(transcriptRepository) },
         )
+        val settingsViewModel: SettingsViewModel = viewModel(
+            factory = SimpleViewModelFactory {
+                SettingsViewModel(settingsRepository, OpenRouterKeyClient())
+            },
+        )
         val discoveryState by discoveryViewModel.uiState.collectAsStateWithLifecycle()
         val jobs by transcriptsViewModel.jobs.collectAsStateWithLifecycle()
+        val transcriptActionMessage by transcriptsViewModel.actionMessage.collectAsStateWithLifecycle()
+        val settingsState by settingsViewModel.uiState.collectAsStateWithLifecycle()
         var selectedTab by rememberSaveable { mutableIntStateOf(0) }
         var detailJobId by rememberSaveable { mutableStateOf<Long?>(null) }
         var showApiKeyDialog by remember { mutableStateOf(false) }
@@ -138,7 +153,7 @@ class MainActivity : ComponentActivity() {
                         title = { Text("Meeting Transcriber") },
                         actions = {
                             IconButton(onClick = { showApiKeyDialog = true }) {
-                                Icon(Icons.Default.Key, contentDescription = "API key")
+                                ApiKeyStatusIcon(settingsState.keyValidation)
                             }
                         },
                     )
@@ -170,7 +185,7 @@ class MainActivity : ComponentActivity() {
                         onChooseFolder = { folderLauncher.launch(null) },
                         onToggleSelection = discoveryViewModel::toggleSelection,
                         onTranscribeSelected = {
-                            if (discoveryViewModel.hasApiKey()) {
+                            if (settingsState.isKeyValid) {
                                 discoveryViewModel.transcribeSelected()
                                 selectedTab = 1
                             } else {
@@ -185,6 +200,10 @@ class MainActivity : ComponentActivity() {
                         onOpenDetail = { detailJobId = it },
                         onShare = { shareTranscript(it.notes, it.plainText) },
                         onRetry = transcriptsViewModel::retry,
+                        onRetryFailed = transcriptsViewModel::retryFailed,
+                        onRestartQueue = transcriptsViewModel::restartQueue,
+                        onFailActiveJobs = transcriptsViewModel::markActiveJobsFailed,
+                        actionMessage = transcriptActionMessage,
                         modifier = Modifier.padding(padding),
                     )
                 }
@@ -194,11 +213,10 @@ class MainActivity : ComponentActivity() {
         if (showApiKeyDialog) {
             ApiKeyDialog(
                 initialValue = settingsRepository.getApiKey().orEmpty(),
+                validation = settingsState.keyValidation,
                 onDismiss = { showApiKeyDialog = false },
-                onSave = { apiKey ->
-                    settingsRepository.saveApiKey(apiKey)
-                    showApiKeyDialog = false
-                },
+                onSaveAndTest = settingsViewModel::saveAndValidateKey,
+                onTestSavedKey = settingsViewModel::validateSavedKey,
             )
         }
     }
@@ -210,6 +228,32 @@ class MainActivity : ComponentActivity() {
         val intent = Intent.createChooser(buildShareIntent(notes, transcript), "Share transcript")
         startActivity(intent)
     }
+}
+
+@Composable
+private fun ApiKeyStatusIcon(validation: ApiKeyValidationSnapshot) {
+    if (validation.status == ApiKeyValidationStatus.CHECKING) {
+        CircularProgressIndicator(modifier = Modifier.padding(8.dp), strokeWidth = 2.dp)
+        return
+    }
+
+    val tint = when (validation.status) {
+        ApiKeyValidationStatus.VALID -> Color(0xFF15803D)
+        ApiKeyValidationStatus.INVALID -> MaterialTheme.colorScheme.error
+        ApiKeyValidationStatus.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
+        ApiKeyValidationStatus.CHECKING -> MaterialTheme.colorScheme.primary
+    }
+    val description = when (validation.status) {
+        ApiKeyValidationStatus.VALID -> "API key valid"
+        ApiKeyValidationStatus.INVALID -> "API key invalid"
+        ApiKeyValidationStatus.UNKNOWN -> "API key not tested"
+        ApiKeyValidationStatus.CHECKING -> "Testing API key"
+    }
+    Icon(
+        imageVector = Icons.Default.Key,
+        contentDescription = description,
+        tint = tint,
+    )
 }
 
 private class SimpleViewModelFactory<T : ViewModel>(

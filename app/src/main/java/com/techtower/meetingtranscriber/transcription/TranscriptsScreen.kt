@@ -3,6 +3,8 @@ package com.techtower.meetingtranscriber.transcription
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,10 +18,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -35,14 +39,22 @@ import com.techtower.meetingtranscriber.util.formatFileSize
 import com.techtower.meetingtranscriber.util.formatModifiedTime
 import com.techtower.meetingtranscriber.util.shortPreview
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun TranscriptsScreen(
     jobs: List<TranscriptJobEntity>,
     onOpenDetail: (Long) -> Unit,
     onShare: (TranscriptJobEntity) -> Unit,
     onRetry: (Long) -> Unit,
+    onRetryFailed: () -> Unit,
+    onRestartQueue: () -> Unit,
+    onFailActiveJobs: () -> Unit,
+    actionMessage: String?,
     modifier: Modifier = Modifier,
 ) {
+    val failedCount = jobs.count { it.status == TranscriptStatus.FAILED }
+    val activeCount = jobs.count { it.status == TranscriptStatus.QUEUED || it.status == TranscriptStatus.PROCESSING }
+
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -54,6 +66,37 @@ fun TranscriptsScreen(
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.SemiBold,
             )
+        }
+        if (failedCount > 0 || activeCount > 0 || actionMessage != null) {
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        if (failedCount > 0) {
+                            Button(onClick = onRetryFailed) {
+                                Text("Retry failed ($failedCount)")
+                            }
+                        }
+                        if (activeCount > 0) {
+                            OutlinedButton(onClick = onRestartQueue) {
+                                Text("Restart queue ($activeCount)")
+                            }
+                            OutlinedButton(onClick = onFailActiveJobs) {
+                                Text("Stop stuck ($activeCount)")
+                            }
+                        }
+                    }
+                    actionMessage?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
         }
         if (jobs.isEmpty()) {
             item {

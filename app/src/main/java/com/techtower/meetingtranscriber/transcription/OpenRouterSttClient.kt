@@ -6,7 +6,6 @@ import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
@@ -14,6 +13,11 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+
+class OpenRouterSttException(
+    val statusCode: Int,
+    responseExcerpt: String,
+) : IOException("HTTP $statusCode: $responseExcerpt")
 
 class OpenRouterSttClient(
     private val httpClient: OkHttpClient = OkHttpClient.Builder()
@@ -41,13 +45,13 @@ class OpenRouterSttClient(
             httpClient.newCall(request).execute().use { response ->
                 val body = response.body?.string().orEmpty()
                 if (!response.isSuccessful) {
-                    throw IOException("HTTP ${response.code}: ${body.take(MAX_ERROR_BODY_CHARS)}")
+                    throw OpenRouterSttException(response.code, body.take(MAX_ERROR_BODY_CHARS))
                 }
                 body
             }
         }
 
-    private fun buildRequestJson(
+    internal fun buildRequestJson(
         model: String,
         audioBytes: ByteArray,
         format: String,
@@ -58,15 +62,8 @@ class OpenRouterSttClient(
                 put("data", Base64.getEncoder().encodeToString(audioBytes))
                 put("format", format)
             }
+            put("language", "en")
             put("temperature", 0)
-            put("response_format", "verbose_json")
-            put("timestamp_granularities", buildJsonArray {
-                add(kotlinx.serialization.json.JsonPrimitive("word"))
-                add(kotlinx.serialization.json.JsonPrimitive("segment"))
-            })
-            putJsonObject("provider") {
-                put("require_parameters", false)
-            }
         }
 
     companion object {

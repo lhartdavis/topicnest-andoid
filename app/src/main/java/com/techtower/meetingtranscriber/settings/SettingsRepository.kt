@@ -16,7 +16,38 @@ class SettingsRepository(context: Context) {
     fun hasApiKey(): Boolean = getApiKey() != null
 
     fun saveApiKey(apiKey: String) {
-        preferences.edit().putString(KEY_OPENROUTER_API_KEY, apiKey.trim()).apply()
+        val trimmedKey = apiKey.trim()
+        val previousKey = getApiKey()
+        preferences.edit()
+            .putString(KEY_OPENROUTER_API_KEY, trimmedKey)
+            .apply()
+        if (previousKey != trimmedKey) {
+            saveApiKeyValidation(
+                ApiKeyValidationSnapshot(
+                    status = ApiKeyValidationStatus.UNKNOWN,
+                    message = "Key has not been tested yet.",
+                ),
+            )
+        }
+    }
+
+    fun getApiKeyValidation(): ApiKeyValidationSnapshot =
+        ApiKeyValidationSnapshot(
+            status = preferences.getString(KEY_API_KEY_STATUS, null)
+                ?.let { runCatching { ApiKeyValidationStatus.valueOf(it) }.getOrNull() }
+                ?: ApiKeyValidationStatus.UNKNOWN,
+            message = preferences.getString(KEY_API_KEY_MESSAGE, null),
+            label = preferences.getString(KEY_API_KEY_LABEL, null),
+            checkedAtMillis = preferences.getLong(KEY_API_KEY_CHECKED_AT, 0L).takeIf { it > 0L },
+        )
+
+    fun saveApiKeyValidation(snapshot: ApiKeyValidationSnapshot) {
+        preferences.edit()
+            .putString(KEY_API_KEY_STATUS, snapshot.status.name)
+            .putString(KEY_API_KEY_MESSAGE, snapshot.message)
+            .putString(KEY_API_KEY_LABEL, snapshot.label)
+            .putLong(KEY_API_KEY_CHECKED_AT, snapshot.checkedAtMillis ?: 0L)
+            .apply()
     }
 
     fun getRecorderTreeUri(): Uri? =
@@ -51,6 +82,10 @@ class SettingsRepository(context: Context) {
         private const val SECURE_PREFS_NAME = "secure_settings"
         private const val FALLBACK_PREFS_NAME = "settings"
         private const val KEY_OPENROUTER_API_KEY = "openrouter_api_key"
+        private const val KEY_API_KEY_STATUS = "openrouter_api_key_status"
+        private const val KEY_API_KEY_MESSAGE = "openrouter_api_key_message"
+        private const val KEY_API_KEY_LABEL = "openrouter_api_key_label"
+        private const val KEY_API_KEY_CHECKED_AT = "openrouter_api_key_checked_at"
         private const val KEY_RECORDER_TREE_URI = "recorder_tree_uri"
         private const val KEY_MAX_DIRECT_UPLOAD_BYTES = "max_direct_upload_bytes"
         const val DEFAULT_MAX_DIRECT_UPLOAD_BYTES: Long = 25L * 1024L * 1024L

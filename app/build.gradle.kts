@@ -6,6 +6,8 @@ plugins {
     alias(libs.plugins.kotlin.kapt)
 }
 
+val javacpp by configurations.creating
+
 android {
     namespace = "com.techtower.meetingtranscriber"
     compileSdk = 35
@@ -17,6 +19,10 @@ android {
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        ndk {
+            // Bytedeco FFmpeg 8.0.1 publishes Android native binaries for 64-bit ABIs.
+            abiFilters += listOf("arm64-v8a", "x86_64")
+        }
     }
 
     buildTypes {
@@ -43,14 +49,34 @@ android {
     }
 
     packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+
+    sourceSets {
+        getByName("main") {
+            jniLibs.srcDir(layout.buildDirectory.dir("javacpp/lib"))
         }
     }
 }
 
 kapt {
     correctErrorTypes = true
+}
+
+tasks.register<Copy>("javacppExtract") {
+    dependsOn(javacpp)
+    from(provider { javacpp.map { zipTree(it) } })
+    include("lib/**")
+    into(layout.buildDirectory.dir("javacpp"))
+}
+
+tasks.named("preBuild") {
+    dependsOn("javacppExtract")
 }
 
 dependencies {
@@ -64,6 +90,8 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.security.crypto)
     implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.bytedeco.ffmpeg)
+    implementation(libs.bytedeco.javacv)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.okhttp)
@@ -75,6 +103,7 @@ dependencies {
     implementation(libs.androidx.material3)
 
     kapt(libs.androidx.room.compiler)
+    javacpp(libs.bytedeco.ffmpeg.platform.gpl)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 

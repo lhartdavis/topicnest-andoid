@@ -12,8 +12,10 @@ import com.techtower.meetingtranscriber.data.entities.TimestampWordEntity
 import com.techtower.meetingtranscriber.data.entities.TranscriptJobEntity
 import com.techtower.meetingtranscriber.data.entities.TranscriptStatus
 import com.techtower.meetingtranscriber.discovery.DiscoveredAudioFile
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.withContext
 
 class TranscriptRepository(
     private val context: Context,
@@ -68,6 +70,50 @@ class TranscriptRepository(
             updatedAt = System.currentTimeMillis(),
         )
         enqueueWorker(jobId)
+    }
+
+    suspend fun retryFailedJobs(): Int {
+        val failedJobs = jobDao.getByStatus(TranscriptStatus.FAILED)
+        failedJobs.forEach { retry(it.id) }
+        return failedJobs.size
+    }
+
+    suspend fun restartActiveQueue(): Int {
+        val activeJobs = jobDao.getByStatuses(
+            listOf(TranscriptStatus.QUEUED, TranscriptStatus.PROCESSING),
+        )
+        if (activeJobs.isEmpty()) return 0
+
+        // A failed WorkManager chain can leave Room rows looking queued while no worker is
+        // actually alive. Restarting cancels the chain and rebuilds it from Room's source of truth.
+        withContext(Dispatchers.IO) {
+            workManager.cancelUniqueWork(WORK_QUEUE_NAME).result.get()
+        }
+        activeJobs.forEach { job ->
+            jobDao.updateStatus(
+                id = job.id,
+                status = TranscriptStatus.QUEUED,
+                errorMessage = null,
+                updatedAt = System.currentTimeMillis(),
+            )
+            enqueueWorker(job.id)
+        }
+        return activeJobs.size
+    }
+
+    suspend fun markActiveJobsFailed(): Int {
+        val activeJobs = jobDao.getByStatuses(
+            listOf(TranscriptStatus.QUEUED, TranscriptStatus.PROCESSING),
+        )
+        activeJobs.forEach { job ->
+            jobDao.updateStatus(
+                id = job.id,
+                status = TranscriptStatus.FAILED,
+                errorMessage = "Stopped by user while repairing the queue.",
+                updatedAt = System.currentTimeMillis(),
+            )
+        }
+        return activeJobs.size
     }
 
     suspend fun updateNotes(jobId: Long, notes: String) {

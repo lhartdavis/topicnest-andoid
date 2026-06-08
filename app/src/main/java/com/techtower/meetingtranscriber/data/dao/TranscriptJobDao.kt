@@ -25,6 +25,18 @@ interface TranscriptJobDao {
     @Query("SELECT * FROM transcript_jobs ORDER BY createdAt DESC")
     fun observeAll(): Flow<List<TranscriptJobEntity>>
 
+    @Query("SELECT * FROM transcript_jobs WHERE status = :status ORDER BY createdAt ASC")
+    suspend fun getByStatus(status: TranscriptStatus): List<TranscriptJobEntity>
+
+    @Query(
+        """
+        SELECT * FROM transcript_jobs
+        WHERE status IN (:statuses)
+        ORDER BY createdAt ASC
+        """,
+    )
+    suspend fun getByStatuses(statuses: List<TranscriptStatus>): List<TranscriptJobEntity>
+
     @Query(
         """
         UPDATE transcript_jobs

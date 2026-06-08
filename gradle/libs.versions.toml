@@ -6,6 +6,8 @@ composeBom = "2024.04.01"
 coreKtx = "1.13.1"
 documentFile = "1.0.1"
 junit = "4.13.2"
+javacv = "1.5.13"
+bytedecoFfmpeg = "8.0.1-1.5.13"
 kotlinxCoroutines = "1.8.1"
 kotlinxSerialization = "1.7.3"
 lifecycle = "2.8.7"
@@ -32,6 +34,9 @@ androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = 
 androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
 androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "work" }
+bytedeco-ffmpeg = { group = "org.bytedeco", name = "ffmpeg", version.ref = "bytedecoFfmpeg" }
+bytedeco-ffmpeg-platform-gpl = { group = "org.bytedeco", name = "ffmpeg-platform-gpl", version.ref = "bytedecoFfmpeg" }
+bytedeco-javacv = { group = "org.bytedeco", name = "javacv", version.ref = "javacv" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
