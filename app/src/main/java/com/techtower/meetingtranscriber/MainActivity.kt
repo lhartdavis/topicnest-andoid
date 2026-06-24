@@ -90,7 +90,7 @@ class MainActivity : ComponentActivity() {
             },
         )
         val transcriptsViewModel: TranscriptsViewModel = viewModel(
-            factory = SimpleViewModelFactory { TranscriptsViewModel(transcriptRepository) },
+            factory = SimpleViewModelFactory { TranscriptsViewModel(transcriptRepository, settingsRepository) },
         )
         val settingsViewModel: SettingsViewModel = viewModel(
             factory = SimpleViewModelFactory {
@@ -99,6 +99,8 @@ class MainActivity : ComponentActivity() {
         )
         val discoveryState by discoveryViewModel.uiState.collectAsStateWithLifecycle()
         val jobs by transcriptsViewModel.jobs.collectAsStateWithLifecycle()
+        val transcriptSearchQuery by transcriptsViewModel.searchQuery.collectAsStateWithLifecycle()
+        val transcriptsCompactList by transcriptsViewModel.isCompactList.collectAsStateWithLifecycle()
         val transcriptActionMessage by transcriptsViewModel.actionMessage.collectAsStateWithLifecycle()
         val settingsState by settingsViewModel.uiState.collectAsStateWithLifecycle()
         var selectedTab by rememberSaveable { mutableIntStateOf(0) }
@@ -205,6 +207,11 @@ class MainActivity : ComponentActivity() {
                         onRetryFailed = transcriptsViewModel::retryFailed,
                         onRestartQueue = transcriptsViewModel::restartQueue,
                         onFailActiveJobs = transcriptsViewModel::markActiveJobsFailed,
+                        onDelete = transcriptsViewModel::delete,
+                        searchQuery = transcriptSearchQuery,
+                        isCompactList = transcriptsCompactList,
+                        onSearchQueryChange = transcriptsViewModel::updateSearchQuery,
+                        onToggleCompactList = transcriptsViewModel::toggleCompactList,
                         actionMessage = transcriptActionMessage,
                         modifier = Modifier.padding(padding),
                     )

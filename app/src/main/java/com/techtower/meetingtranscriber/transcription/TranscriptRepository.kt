@@ -125,6 +125,16 @@ class TranscriptRepository(
         jobDao.updateNotes(jobId, notes, System.currentTimeMillis())
     }
 
+    suspend fun deleteTranscriptJob(jobId: Long) {
+        database.withTransaction {
+            // Delete only derived transcript data. The recorder's original audio URI points to
+            // user-owned media outside Room, so removing a transcript must never touch the source.
+            segmentDao.deleteForJob(jobId)
+            wordDao.deleteForJob(jobId)
+            jobDao.deleteById(jobId)
+        }
+    }
+
     suspend fun markProcessing(jobId: Long) {
         jobDao.updateStatus(jobId, TranscriptStatus.PROCESSING, null, System.currentTimeMillis())
     }

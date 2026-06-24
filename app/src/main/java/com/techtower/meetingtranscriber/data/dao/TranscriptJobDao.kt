@@ -65,4 +65,7 @@ interface TranscriptJobDao {
         """,
     )
     suspend fun updateNotes(id: Long, notes: String, updatedAt: Long)
+
+    @Query("DELETE FROM transcript_jobs WHERE id = :id")
+    suspend fun deleteById(id: Long)
 }

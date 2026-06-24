@@ -15,8 +15,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ViewList
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -24,8 +28,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,11 +59,18 @@ fun TranscriptsScreen(
     onRetryFailed: () -> Unit,
     onRestartQueue: () -> Unit,
     onFailActiveJobs: () -> Unit,
+    onDelete: (Long) -> Unit,
+    searchQuery: String,
+    isCompactList: Boolean,
+    onSearchQueryChange: (String) -> Unit,
+    onToggleCompactList: () -> Unit,
     actionMessage: String?,
     modifier: Modifier = Modifier,
 ) {
+    var pendingDeleteJob by remember { mutableStateOf<TranscriptJobEntity?>(null) }
     val failedCount = jobs.count { it.status == TranscriptStatus.FAILED }
     val activeCount = jobs.count { it.status == TranscriptStatus.QUEUED || it.status == TranscriptStatus.PROCESSING }
+    val displayJobs = rankTranscriptJobs(jobs, searchQuery)
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -61,10 +78,11 @@ fun TranscriptsScreen(
         contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
     ) {
         item {
-            Text(
-                text = "Transcripts",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.SemiBold,
+            TranscriptsHeader(
+                searchQuery = searchQuery,
+                isCompactList = isCompactList,
+                onSearchQueryChange = onSearchQueryChange,
+                onToggleCompactList = onToggleCompactList,
             )
         }
         if (failedCount > 0 || activeCount > 0 || actionMessage != null) {
@@ -105,25 +123,98 @@ fun TranscriptsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        } else if (displayJobs.isEmpty()) {
+            item {
+                Text(
+                    text = "No transcripts match this search.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         } else {
-            items(jobs, key = { it.id }) { job ->
+            items(displayJobs, key = { it.id }) { job ->
                 TranscriptJobRow(
                     job = job,
+                    compact = isCompactList,
                     onOpenDetail = onOpenDetail,
                     onShare = onShare,
                     onRetry = onRetry,
+                    onRequestDelete = { pendingDeleteJob = job },
                 )
             }
         }
+    }
+
+    pendingDeleteJob?.let { job ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteJob = null },
+            title = { Text("Delete transcript?") },
+            text = {
+                Text("This removes the transcript, notes, timestamps, and job record. The original audio file stays on your device.")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        pendingDeleteJob = null
+                        onDelete(job.id)
+                    },
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteJob = null }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun TranscriptsHeader(
+    searchQuery: String,
+    isCompactList: Boolean,
+    onSearchQueryChange: (String) -> Unit,
+    onToggleCompactList: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Transcripts",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+            IconButton(onClick = onToggleCompactList) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ViewList,
+                    contentDescription = if (isCompactList) "Use detailed list" else "Use compact list",
+                    tint = if (isCompactList) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = onSearchQueryChange,
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            label = { Text("Search transcripts") },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+        )
     }
 }
 
 @Composable
 private fun TranscriptJobRow(
     job: TranscriptJobEntity,
+    compact: Boolean,
     onOpenDetail: (Long) -> Unit,
     onShare: (TranscriptJobEntity) -> Unit,
     onRetry: (Long) -> Unit,
+    onRequestDelete: () -> Unit,
 ) {
     Card(
         modifier = Modifier
@@ -137,40 +228,59 @@ private fun TranscriptJobRow(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = job.displayName,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    StatusChip(job.status)
-                }
+            if (compact) {
                 Text(
-                    text = "${formatDuration(job.durationMillis)} | ${formatFileSize(job.sizeBytes)} | ${formatModifiedTime(job.createdAt)}",
-                    style = MaterialTheme.typography.bodySmall,
+                    text = formatDuration(job.durationMillis),
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                if (job.status == TranscriptStatus.TRANSCRIBED) {
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = job.displayName,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                StatusChip(job.status)
+            } else {
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = job.displayName,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        StatusChip(job.status)
+                    }
                     Text(
-                        text = shortPreview(job.plainText),
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                if (job.status == TranscriptStatus.FAILED && job.errorMessage != null) {
-                    Text(
-                        text = job.errorMessage,
+                        text = "${formatDuration(job.durationMillis)} | ${formatFileSize(job.sizeBytes)} | ${formatModifiedTime(job.createdAt)}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    if (job.status == TranscriptStatus.TRANSCRIBED) {
+                        Text(
+                            text = shortPreview(job.plainText),
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    if (job.status == TranscriptStatus.FAILED && job.errorMessage != null) {
+                        Text(
+                            text = job.errorMessage,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
             if (job.status == TranscriptStatus.TRANSCRIBED) {
@@ -182,6 +292,9 @@ private fun TranscriptJobRow(
                 IconButton(onClick = { onRetry(job.id) }) {
                     Icon(Icons.Default.Refresh, contentDescription = "Retry")
                 }
+            }
+            IconButton(onClick = onRequestDelete) {
+                Icon(Icons.Default.Delete, contentDescription = "Delete transcript")
             }
         }
     }

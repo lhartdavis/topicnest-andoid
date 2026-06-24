@@ -69,6 +69,13 @@ class SettingsRepository internal constructor(
         preferences.edit().putBoolean(KEY_DISCOVERY_COMPACT_LIST, enabled).apply()
     }
 
+    fun isTranscriptsCompactList(): Boolean =
+        preferences.getBoolean(KEY_TRANSCRIPTS_COMPACT_LIST, false)
+
+    fun saveTranscriptsCompactList(enabled: Boolean) {
+        preferences.edit().putBoolean(KEY_TRANSCRIPTS_COMPACT_LIST, enabled).apply()
+    }
+
     companion object {
         private fun createPreferences(context: Context): SharedPreferences =
             try {
@@ -98,6 +105,7 @@ class SettingsRepository internal constructor(
         private const val KEY_RECORDER_TREE_URI = "recorder_tree_uri"
         private const val KEY_MAX_DIRECT_UPLOAD_BYTES = "max_direct_upload_bytes"
         private const val KEY_DISCOVERY_COMPACT_LIST = "discovery_compact_list"
+        private const val KEY_TRANSCRIPTS_COMPACT_LIST = "transcripts_compact_list"
         const val DEFAULT_MAX_DIRECT_UPLOAD_BYTES: Long = 25L * 1024L * 1024L
     }
 }

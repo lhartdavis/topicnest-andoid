@@ -17,4 +17,17 @@ class SettingsRepositoryTest {
         repository.saveDiscoveryCompactList(false)
         assertFalse(repository.isDiscoveryCompactList())
     }
+
+    @Test
+    fun transcriptsCompactList_defaultsToDetailedAndPersistsChoice() {
+        val repository = SettingsRepository(FakeSharedPreferences())
+
+        assertFalse(repository.isTranscriptsCompactList())
+
+        repository.saveTranscriptsCompactList(true)
+        assertTrue(repository.isTranscriptsCompactList())
+
+        repository.saveTranscriptsCompactList(false)
+        assertFalse(repository.isTranscriptsCompactList())
+    }
 }

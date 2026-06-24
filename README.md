@@ -10,6 +10,8 @@ A simple standalone native Android app for finding meeting recordings on the pho
 - Queues one or more files for transcription with WorkManager.
 - Stores jobs, notes, transcript text, raw provider JSON, and optional word/segment timestamps in Room.
 - Plays the source audio from transcript detail and highlights the current word or segment when timestamps are available.
+- Searches transcript titles, notes, and text with title matches ranked highest.
+- Deletes transcript jobs and timestamp rows without deleting the original audio file.
 - Shares plain text only with notes first, then transcript text.
 
 ## Run It
