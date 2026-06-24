@@ -33,6 +33,8 @@ class TranscriptRepository(
         jobDao.observeAudioUrisByStatus(TranscriptStatus.TRANSCRIBED)
             .map { it.toSet() }
 
+    suspend fun getAllAudioUris(): Set<String> = jobDao.getAllAudioUris().toSet()
+
     fun observeDetail(jobId: Long): Flow<TranscriptDetail?> =
         combine(
             jobDao.observeById(jobId),

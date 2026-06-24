@@ -76,6 +76,13 @@ class SettingsRepository internal constructor(
         preferences.edit().putBoolean(KEY_TRANSCRIPTS_COMPACT_LIST, enabled).apply()
     }
 
+    fun isAutonomousModeEnabled(): Boolean =
+        preferences.getBoolean(KEY_AUTONOMOUS_MODE_ENABLED, false)
+
+    fun saveAutonomousModeEnabled(enabled: Boolean) {
+        preferences.edit().putBoolean(KEY_AUTONOMOUS_MODE_ENABLED, enabled).apply()
+    }
+
     companion object {
         private fun createPreferences(context: Context): SharedPreferences =
             try {
@@ -106,6 +113,7 @@ class SettingsRepository internal constructor(
         private const val KEY_MAX_DIRECT_UPLOAD_BYTES = "max_direct_upload_bytes"
         private const val KEY_DISCOVERY_COMPACT_LIST = "discovery_compact_list"
         private const val KEY_TRANSCRIPTS_COMPACT_LIST = "transcripts_compact_list"
+        private const val KEY_AUTONOMOUS_MODE_ENABLED = "autonomous_mode_enabled"
         const val DEFAULT_MAX_DIRECT_UPLOAD_BYTES: Long = 25L * 1024L * 1024L
     }
 }

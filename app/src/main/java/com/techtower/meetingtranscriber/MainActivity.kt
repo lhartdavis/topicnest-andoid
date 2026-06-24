@@ -10,6 +10,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Article
+import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
@@ -50,6 +51,7 @@ import com.techtower.meetingtranscriber.settings.ApiKeyDialog
 import com.techtower.meetingtranscriber.settings.OpenRouterKeyClient
 import com.techtower.meetingtranscriber.settings.SettingsRepository
 import com.techtower.meetingtranscriber.settings.SettingsViewModel
+import com.techtower.meetingtranscriber.transcription.AutonomousTranscriptionScheduler
 import com.techtower.meetingtranscriber.transcription.TranscriptDetailScreen
 import com.techtower.meetingtranscriber.transcription.TranscriptDetailViewModel
 import com.techtower.meetingtranscriber.transcription.TranscriptRepository
@@ -94,7 +96,11 @@ class MainActivity : ComponentActivity() {
         )
         val settingsViewModel: SettingsViewModel = viewModel(
             factory = SimpleViewModelFactory {
-                SettingsViewModel(settingsRepository, OpenRouterKeyClient())
+                SettingsViewModel(
+                    settingsRepository,
+                    OpenRouterKeyClient(),
+                    AutonomousTranscriptionScheduler(this),
+                )
             },
         )
         val discoveryState by discoveryViewModel.uiState.collectAsStateWithLifecycle()
@@ -154,6 +160,27 @@ class MainActivity : ComponentActivity() {
                     TopAppBar(
                         title = { Text("Meeting Transcriber") },
                         actions = {
+                            IconButton(
+                                onClick = {
+                                    settingsViewModel.setAutonomousModeEnabled(
+                                        !settingsState.autonomousModeEnabled,
+                                    )
+                                },
+                            ) {
+                                Icon(
+                                    Icons.Default.Autorenew,
+                                    contentDescription = if (settingsState.autonomousModeEnabled) {
+                                        "Disable autonomous mode"
+                                    } else {
+                                        "Enable autonomous mode"
+                                    },
+                                    tint = if (settingsState.autonomousModeEnabled) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                                )
+                            }
                             IconButton(onClick = { showApiKeyDialog = true }) {
                                 ApiKeyStatusIcon(settingsState.keyValidation)
                             }

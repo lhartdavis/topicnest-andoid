@@ -28,6 +28,9 @@ interface TranscriptJobDao {
     @Query("SELECT audioUri FROM transcript_jobs WHERE status = :status")
     fun observeAudioUrisByStatus(status: TranscriptStatus): Flow<List<String>>
 
+    @Query("SELECT audioUri FROM transcript_jobs")
+    suspend fun getAllAudioUris(): List<String>
+
     @Query("SELECT * FROM transcript_jobs WHERE status = :status ORDER BY createdAt ASC")
     suspend fun getByStatus(status: TranscriptStatus): List<TranscriptJobEntity>
 

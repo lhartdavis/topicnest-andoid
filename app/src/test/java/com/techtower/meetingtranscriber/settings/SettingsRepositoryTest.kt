@@ -30,4 +30,17 @@ class SettingsRepositoryTest {
         repository.saveTranscriptsCompactList(false)
         assertFalse(repository.isTranscriptsCompactList())
     }
+
+    @Test
+    fun autonomousMode_defaultsOffAndPersistsChoice() {
+        val repository = SettingsRepository(FakeSharedPreferences())
+
+        assertFalse(repository.isAutonomousModeEnabled())
+
+        repository.saveAutonomousModeEnabled(true)
+        assertTrue(repository.isAutonomousModeEnabled())
+
+        repository.saveAutonomousModeEnabled(false)
+        assertFalse(repository.isAutonomousModeEnabled())
+    }
 }

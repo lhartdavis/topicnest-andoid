@@ -8,6 +8,7 @@ A simple standalone native Android app for finding meeting recordings on the pho
 - Lets the user choose a recorder folder with Android's document tree picker when MediaStore is empty or permission is denied.
 - Searches discovered filenames, keeps already-transcribed files in a separate read-only section, and remembers the compact/detailed discovery layout.
 - Queues one or more files for transcription with WorkManager.
+- Offers an autonomous mode that hourly queues new recordings from the past 48 hours when they are longer than 5 minutes and no longer than 3 hours.
 - Stores jobs, notes, transcript text, raw provider JSON, and optional word/segment timestamps in Room.
 - Plays the source audio from transcript detail and highlights the current word or segment when timestamps are available.
 - Searches transcript titles, notes, and text with title matches ranked highest.
@@ -75,3 +76,7 @@ The Transcripts tab includes recovery actions when jobs fail or appear stuck:
 - **Stop stuck** marks queued/processing jobs as failed so they no longer block the workflow.
 
 Use **Test key** first when jobs fail with HTTP 400 or auth-like errors. For `Broken pipe`, retry on a stable connection; the worker will convert or chunk oversized audio before retrying.
+
+## Autonomous Mode
+
+The circling-arrows button in the top app bar toggles autonomous mode. When enabled, WorkManager runs an hourly scan of the same MediaStore and chosen-folder sources used by Discovery. The scan queues only recordings with a known modified time in the past 48 hours, known duration greater than 5 minutes, and duration no longer than 3 hours. Any recording that already has a queued, processing, failed, or transcribed job is skipped so the app does not create duplicates.
