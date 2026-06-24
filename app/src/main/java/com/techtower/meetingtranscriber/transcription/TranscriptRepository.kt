@@ -15,6 +15,7 @@ import com.techtower.meetingtranscriber.discovery.DiscoveredAudioFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
 class TranscriptRepository(
@@ -27,6 +28,10 @@ class TranscriptRepository(
     private val workManager = WorkManager.getInstance(context.applicationContext)
 
     fun observeJobs(): Flow<List<TranscriptJobEntity>> = jobDao.observeAll()
+
+    fun observeTranscribedAudioUris(): Flow<Set<String>> =
+        jobDao.observeAudioUrisByStatus(TranscriptStatus.TRANSCRIBED)
+            .map { it.toSet() }
 
     fun observeDetail(jobId: Long): Flow<TranscriptDetail?> =
         combine(

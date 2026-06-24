@@ -6,6 +6,7 @@ A simple standalone native Android app for finding meeting recordings on the pho
 
 - Discovers audio in `Music/Record/SoundRecord/` using MediaStore.
 - Lets the user choose a recorder folder with Android's document tree picker when MediaStore is empty or permission is denied.
+- Searches discovered filenames, keeps already-transcribed files in a separate read-only section, and remembers the compact/detailed discovery layout.
 - Queues one or more files for transcription with WorkManager.
 - Stores jobs, notes, transcript text, raw provider JSON, and optional word/segment timestamps in Room.
 - Plays the source audio from transcript detail and highlights the current word or segment when timestamps are available.

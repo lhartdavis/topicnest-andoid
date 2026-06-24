@@ -15,8 +15,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -26,6 +28,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -56,6 +59,8 @@ fun DiscoveryScreen(
     onChooseFolder: () -> Unit,
     onToggleSelection: (String) -> Unit,
     onTranscribeSelected: () -> Unit,
+    onSearchQueryChange: (String) -> Unit,
+    onToggleCompactList: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var showLargeFileWarning by remember { mutableStateOf(false) }
@@ -77,6 +82,10 @@ fun DiscoveryScreen(
                     onRefresh = onRefresh,
                     onRequestPermission = onRequestPermission,
                     onChooseFolder = onChooseFolder,
+                    searchQuery = state.searchQuery,
+                    isCompactList = state.isCompactList,
+                    onSearchQueryChange = onSearchQueryChange,
+                    onToggleCompactList = onToggleCompactList,
                 )
             }
             state.message?.let { message ->
@@ -97,21 +106,44 @@ fun DiscoveryScreen(
                         file = file,
                         selected = file.id in state.selectedIds,
                         maxDirectUploadBytes = maxDirectUploadBytes,
+                        compact = state.isCompactList,
+                        selectable = true,
                         onToggleSelection = onToggleSelection,
                     )
                 }
             }
             item { SectionTitle("Browse") }
-            if (state.files.isEmpty()) {
+            if (state.browseFiles.isEmpty()) {
                 item {
-                    EmptyLine("No audio files found in Music/Record/SoundRecord. Tap Refresh or choose the folder manually.")
+                    EmptyLine(
+                        if (state.searchQuery.isBlank()) {
+                            "No audio files found in Music/Record/SoundRecord. Tap Refresh or choose the folder manually."
+                        } else {
+                            "No untranscribed files match this search."
+                        },
+                    )
                 }
             } else {
-                items(state.files, key = { "browse-${it.id}" }) { file ->
+                items(state.browseFiles, key = { "browse-${it.id}" }) { file ->
                     AudioFileRow(
                         file = file,
                         selected = file.id in state.selectedIds,
                         maxDirectUploadBytes = maxDirectUploadBytes,
+                        compact = state.isCompactList,
+                        selectable = true,
+                        onToggleSelection = onToggleSelection,
+                    )
+                }
+            }
+            if (state.transcribedFiles.isNotEmpty()) {
+                item { SectionTitle("Transcribed") }
+                items(state.transcribedFiles, key = { "transcribed-${it.id}" }) { file ->
+                    AudioFileRow(
+                        file = file,
+                        selected = false,
+                        maxDirectUploadBytes = maxDirectUploadBytes,
+                        compact = state.isCompactList,
+                        selectable = false,
                         onToggleSelection = onToggleSelection,
                     )
                 }
@@ -119,7 +151,7 @@ fun DiscoveryScreen(
         }
 
         AnimatedVisibility(
-            visible = state.selectedIds.isNotEmpty(),
+            visible = state.selectedFileCount > 0,
             modifier = Modifier.align(Alignment.BottomCenter),
         ) {
             Surface(
@@ -134,7 +166,7 @@ fun DiscoveryScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("${state.selectedIds.size} selected")
+                    Text("${state.selectedFileCount} selected")
                     Button(
                         onClick = {
                             if (state.selectedFiles.any { requiresDirectUploadWarning(it.sizeBytes, maxDirectUploadBytes) }) {
@@ -184,6 +216,10 @@ private fun DiscoveryHeader(
     onRefresh: () -> Unit,
     onRequestPermission: () -> Unit,
     onChooseFolder: () -> Unit,
+    searchQuery: String,
+    isCompactList: Boolean,
+    onSearchQueryChange: (String) -> Unit,
+    onToggleCompactList: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(
@@ -205,11 +241,35 @@ private fun DiscoveryHeader(
                 Text("Grant audio access")
             }
         }
-        ElevatedButton(onClick = onChooseFolder) {
-            Icon(Icons.Default.FolderOpen, contentDescription = null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Choose recorder folder")
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ElevatedButton(
+                onClick = onChooseFolder,
+                modifier = Modifier.weight(1f),
+            ) {
+                Icon(Icons.Default.FolderOpen, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Choose recorder folder")
+            }
+            IconButton(onClick = onToggleCompactList) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ViewList,
+                    contentDescription = if (isCompactList) "Use detailed list" else "Use compact list",
+                    tint = if (isCompactList) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = onSearchQueryChange,
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            label = { Text("Search filenames") },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+        )
     }
 }
 
@@ -238,12 +298,19 @@ private fun AudioFileRow(
     file: DiscoveredAudioFile,
     selected: Boolean,
     maxDirectUploadBytes: Long,
+    compact: Boolean,
+    selectable: Boolean,
     onToggleSelection: (String) -> Unit,
 ) {
-    Card(
-        modifier = Modifier
+    val cardModifier = if (selectable) {
+        Modifier
             .fillMaxWidth()
-            .clickable { onToggleSelection(file.id) },
+            .clickable { onToggleSelection(file.id) }
+    } else {
+        Modifier.fillMaxWidth()
+    }
+    Card(
+        modifier = cardModifier,
     ) {
         Row(
             modifier = Modifier
@@ -251,41 +318,60 @@ private fun AudioFileRow(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Checkbox(
-                checked = selected,
-                onCheckedChange = { onToggleSelection(file.id) },
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-            Column(modifier = Modifier.weight(1f)) {
+            if (selectable) {
+                Checkbox(
+                    checked = selected,
+                    onCheckedChange = { onToggleSelection(file.id) },
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+            }
+            if (compact) {
+                Text(
+                    text = formatDuration(file.durationMillis),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.width(10.dp))
                 Text(
                     text = file.displayName,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = listOf(
-                        formatDuration(file.durationMillis),
-                        formatFileSize(file.sizeBytes),
-                        formatModifiedTime(file.modifiedEpochMillis),
-                    ).joinToString(" | "),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    text = listOfNotNull(file.mimeType, file.source.label()).joinToString(" | "),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (file.willUseAutomaticMp3Processing(maxDirectUploadBytes)) {
+            } else {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = file.displayName,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Will convert to MP3 automatically",
+                        text = listOf(
+                            formatDuration(file.durationMillis),
+                            formatFileSize(file.sizeBytes),
+                            formatModifiedTime(file.modifiedEpochMillis),
+                        ).joinToString(" | "),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    Text(
+                        text = listOfNotNull(file.mimeType, file.source.label()).joinToString(" | "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (file.willUseAutomaticMp3Processing(maxDirectUploadBytes)) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Will convert to MP3 automatically",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                 }
             }
         }

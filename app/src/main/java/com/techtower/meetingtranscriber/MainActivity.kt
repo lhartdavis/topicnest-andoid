@@ -192,6 +192,8 @@ class MainActivity : ComponentActivity() {
                                 showApiKeyDialog = true
                             }
                         },
+                        onSearchQueryChange = discoveryViewModel::updateSearchQuery,
+                        onToggleCompactList = discoveryViewModel::toggleCompactList,
                         modifier = Modifier.padding(padding),
                     )
                 } else {

@@ -8,8 +8,10 @@ import android.net.Uri
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 
-class SettingsRepository(context: Context) {
-    private val preferences: SharedPreferences = createPreferences(context.applicationContext)
+class SettingsRepository internal constructor(
+    private val preferences: SharedPreferences,
+) {
+    constructor(context: Context) : this(createPreferences(context.applicationContext))
 
     fun getApiKey(): String? = preferences.getString(KEY_OPENROUTER_API_KEY, null)?.takeIf { it.isNotBlank() }
 
@@ -60,25 +62,32 @@ class SettingsRepository(context: Context) {
     fun getMaxDirectUploadBytes(): Long =
         preferences.getLong(KEY_MAX_DIRECT_UPLOAD_BYTES, DEFAULT_MAX_DIRECT_UPLOAD_BYTES)
 
-    private fun createPreferences(context: Context): SharedPreferences =
-        try {
-            val masterKey = MasterKey.Builder(context)
-                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                .build()
-            EncryptedSharedPreferences.create(
-                context,
-                SECURE_PREFS_NAME,
-                masterKey,
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
-            )
-        } catch (_: Exception) {
-            // TODO: Surface this security downgrade in a real settings screen. The fallback keeps
-            // the MVP usable on devices where AndroidX Security cannot create a master key.
-            context.getSharedPreferences(FALLBACK_PREFS_NAME, Context.MODE_PRIVATE)
-        }
+    fun isDiscoveryCompactList(): Boolean =
+        preferences.getBoolean(KEY_DISCOVERY_COMPACT_LIST, false)
+
+    fun saveDiscoveryCompactList(enabled: Boolean) {
+        preferences.edit().putBoolean(KEY_DISCOVERY_COMPACT_LIST, enabled).apply()
+    }
 
     companion object {
+        private fun createPreferences(context: Context): SharedPreferences =
+            try {
+                val masterKey = MasterKey.Builder(context)
+                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                    .build()
+                EncryptedSharedPreferences.create(
+                    context,
+                    SECURE_PREFS_NAME,
+                    masterKey,
+                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+                )
+            } catch (_: Exception) {
+                // TODO: Surface this security downgrade in a real settings screen. The fallback keeps
+                // the MVP usable on devices where AndroidX Security cannot create a master key.
+                context.getSharedPreferences(FALLBACK_PREFS_NAME, Context.MODE_PRIVATE)
+            }
+
         private const val SECURE_PREFS_NAME = "secure_settings"
         private const val FALLBACK_PREFS_NAME = "settings"
         private const val KEY_OPENROUTER_API_KEY = "openrouter_api_key"
@@ -88,6 +97,7 @@ class SettingsRepository(context: Context) {
         private const val KEY_API_KEY_CHECKED_AT = "openrouter_api_key_checked_at"
         private const val KEY_RECORDER_TREE_URI = "recorder_tree_uri"
         private const val KEY_MAX_DIRECT_UPLOAD_BYTES = "max_direct_upload_bytes"
+        private const val KEY_DISCOVERY_COMPACT_LIST = "discovery_compact_list"
         const val DEFAULT_MAX_DIRECT_UPLOAD_BYTES: Long = 25L * 1024L * 1024L
     }
 }
